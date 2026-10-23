@@ -1,6 +1,15 @@
 
 import SwiftUI
 
+@main
+struct CloudWinApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+    }
+}
+
 struct ContentView: View {
     @AppStorage("cloudWinURL")
     private var cloudWinURL = ""
@@ -10,8 +19,7 @@ struct ContentView: View {
 
     private var validURL: URL? {
         guard let url = URL(string: cloudWinURL),
-              let scheme = url.scheme?.lowercased(),
-              ["https"].contains(scheme),
+              url.scheme?.lowercased() == "https",
               url.host != nil else {
             return nil
         }
@@ -45,14 +53,16 @@ struct ContentView: View {
                 .autocorrectionDisabled()
                 .padding()
                 .background(.white)
+                .foregroundStyle(.black)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
 
                 Button {
-                    if let url = validURL {
-                        openURL(url)
-                    } else {
-                        message = "Enter a valid HTTPS address for your remote desktop service."
+                    guard let url = validURL else {
+                        message = "Enter a valid HTTPS address first."
+                        return
                     }
+
+                    openURL(url)
                 } label: {
                     Label(
                         "LAUNCH WINDOWS",
@@ -67,8 +77,8 @@ struct ContentView: View {
                 }
 
                 Text(
-                    "A real remote desktop service is required. " +
-                    "This app does not create or host a Windows PC."
+                    "A remote desktop service is required. " +
+                    "CloudWin does not host Windows itself."
                 )
                 .font(.footnote)
                 .foregroundStyle(.white.opacity(0.65))
@@ -87,8 +97,4 @@ struct ContentView: View {
         }
         .preferredColorScheme(.dark)
     }
-}
-
-#Preview {
-    ContentView()
 }
