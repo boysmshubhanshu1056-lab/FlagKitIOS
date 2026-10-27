@@ -2,34 +2,47 @@
 name: Build FlagKit iOS IPA
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  build:
-    name: Build unsigned iOS IPA
+  build-ios:
+    name: Build and Package iOS App
     runs-on: macos-15
+    timeout-minutes: 30
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Check Xcode
-        run: xcodebuild -version
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+          xcodebuild -version
 
       - name: Install XcodeGen
-        run: brew install xcodegen
-
-      - name: Generate Xcode project
-        run: xcodegen generate
-
-      - name: Build iOS app
         run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+          xcodegen --version
+
+      - name: Generate Xcode Project
+        run: |
+          set -euo pipefail
+          xcodegen generate --spec project.yml
+          echo "Generated project files:"
+          ls -la
+
+      - name: Build iOS App
+        run: |
+          set -o pipefail
+
           xcodebuild \
             -project FlagKitIOS.xcodeproj \
             -scheme FlagKitIOS \
@@ -38,28 +51,63 @@ jobs:
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            build
+            CODE_SIGN_IDENTITY="" \
+            build 2>&1 | tee build.log
 
-      - name: Package IPA
+      - name: Show Build Products
+        if: always()
         run: |
-          APP_PATH="build/Build/Products/Release-iphoneos/FlagKitIOS.app"
+          echo "Searching for iOS app bundles..."
+          find build -type d -name '*.app' -print 2>/dev/null || true
 
-          if [ ! -d "$APP_PATH" ]; then
-            echo "ERROR: Built .app not found"
+      - name: Package iOS
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Searching for the built iOS app..."
+
+          APP_PATH="$(find build -type d -name '*.app' \
+            -path '*/Release-iphoneos/*' -print -quit 2>/dev/null || true)"
+
+          if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
+            echo "ERROR: No Release iOS .app bundle was found."
+            echo "Build products:"
+            find build -maxdepth 8 \
+              \( -name '*.app' -o -name '*.xcarchive' \) \
+              -print 2>/dev/null || true
             exit 1
           fi
 
+          echo "Found app: $APP_PATH"
+
+          rm -rf ipa
           mkdir -p ipa/Payload
-          cp -R "$APP_PATH" ipa/Payload/FlagKitIOS.app
+
+          APP_NAME="$(basename "$APP_PATH")"
+          cp -R "$APP_PATH" "ipa/Payload/$APP_NAME"
 
           cd ipa
           zip -r ../FlagKitIOS-unsigned.ipa Payload
           cd ..
 
-      - name: Upload IPA artifact
+          echo "IPA created successfully:"
+          ls -lh FlagKitIOS-unsigned.ipa
+
+      - name: Upload Unsigned IPA
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: FlagKitIOS-unsigned-ipa
+          name: FlagKit-unsigned-ipa
           path: FlagKitIOS-unsigned.ipa
           if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload Build Log on Failure
+        if: failure() && hashFiles('build.log') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: FlagKit-build-log
+          path: build.log
+          if-no-files-found: warn
           retention-days: 7
