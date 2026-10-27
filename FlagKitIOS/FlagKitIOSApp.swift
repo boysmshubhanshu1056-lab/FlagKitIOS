@@ -4,7 +4,7 @@ import SwiftUI
 struct FlagKitIOSApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView().preferredColorScheme(.dark)
         }
     }
 }
