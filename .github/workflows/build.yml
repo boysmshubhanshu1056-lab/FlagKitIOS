@@ -1,0 +1,65 @@
+
+name: Build FlagKit iOS IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build unsigned iOS IPA
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check Xcode
+        run: xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build iOS app
+        run: |
+          xcodebuild \
+            -project FlagKitIOS.xcodeproj \
+            -scheme FlagKitIOS \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+
+      - name: Package IPA
+        run: |
+          APP_PATH="build/Build/Products/Release-iphoneos/FlagKitIOS.app"
+
+          if [ ! -d "$APP_PATH" ]; then
+            echo "ERROR: Built .app not found"
+            exit 1
+          fi
+
+          mkdir -p ipa/Payload
+          cp -R "$APP_PATH" ipa/Payload/FlagKitIOS.app
+
+          cd ipa
+          zip -r ../FlagKitIOS-unsigned.ipa Payload
+          cd ..
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FlagKitIOS-unsigned-ipa
+          path: FlagKitIOS-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 7
