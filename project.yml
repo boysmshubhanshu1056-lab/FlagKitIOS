@@ -1,0 +1,21 @@
+name: FlagKitIOS
+options:
+  bundleIdPrefix: com.example.flagkit
+  deploymentTarget:
+    iOS: "16.0"
+targets:
+  FlagKitIOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: FlagKitIOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.flagkit.ios
+        PRODUCT_NAME: FlagKit
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: FlagKit
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
+        IPHONEOS_DEPLOYMENT_TARGET: "16.0"
